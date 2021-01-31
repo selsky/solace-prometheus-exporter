@@ -20,19 +20,44 @@ It implements the following endpoints:
 ```
 http://<host>:<port>/         Document page showing list of endpoints
 http://<host>:<port>/metrics             Golang and standard Prometheus metrics
-http://<host>:<port>/solace-std          Solace metrics for System and VPN levels
-http://<host>:<port>/solace-det          Solace metrics for Messaging Clients and Queues
-http://<host>:<port>/solace-broker-std   Solace Broker only Standard Metrics (System)
-http://<host>:<port>/solace-vpn-std      Solace Vpn only Standard Metrics (VPN), available to non-global access right admins
-http://<host>:<port>/solace-vpn-stats    Solace Vpn only Statistics Metrics (VPN), available to non-global access right admins
-http://<host>:<port>/solace-vpn-det      Solace Vpn only Detailed Metrics (VPN), available to non-global access right admins
+http://<host>:<port>/solace-std          Deprecated: Solace metrics for System and VPN levels
+http://<host>:<port>/solace-det          Deprecated: Solace metrics for Messaging Clients and Queues
+http://<host>:<port>/solace-broker-std   Deprecated: Solace Broker only Standard Metrics (System)
+http://<host>:<port>/solace-vpn-std      Deprecated: Solace Vpn only Standard Metrics (VPN), available to non-global access right admins
+http://<host>:<port>/solace-vpn-stats    Deprecated: Solace Vpn only Statistics Metrics (VPN), available to non-global access right admins
+http://<host>:<port>/solace-vpn-det      Deprecated: Solace Vpn only Detailed Metrics (VPN), available to non-global access right admins
+http://<host>:<port>/solace              The modular endpoint
 ```
-There are 3 type that have different performance criticality.
-- std: not harm the broker performance
-- stats: may slow down your broker a little
-- det: will harm broker performance, if you have up to 1000 queues
 
-If you are running a cloud broker, you should use the `solace-vpn` endpoints. Because you will not have the permissions required for the global one.
+### Modular endpoint explained
+
+Configure the data you want ot receive, via HTTP GET parameters.
+Please use in the format: "m.ClientStats=*|*&m.VpnStats=*|*"  
+Here is "m." the prefix.  
+Here is "ClientStats" the scrape target.  
+The first asterisk the VPN filter, and the second asterisk the item filter. Not all scrape targets support filter.
+Scrape targets:
+
+
+| scape target	| vpn filter supports | item filter supported | performance impact |
+|---------------|---------------------|-----------------------|------------------------|
+| Version | no | no | dont harm broker |
+| Health | no | no | dont harm broker |
+| Spool | no | no | dont harm broker |
+| Redundancy (only for HA broker) | no | no | dont harm broker |
+| ConfigSyncRouter (only for HA broker) | no | no | dont harm broker |
+| Vpn | yes | no | dont harm broker |
+| VpnReplication | yes | no | dont harm broker |
+| ConfigSyncVpn (only for HA broker) | yes | no | dont harm broker |
+| Bridge | yes | yes | dont harm broker |
+| VpnSpool | yes | no | dont harm broker |
+| ClientStats | yes | no | may harm broker if many clients |
+| VpnStats | yes | no | has a very small performance down site |
+| BridgeStats | yes | yes | has a very small performance down site |
+| QueueRates | yes | yes | may harm broker if many queues |
+| QueueUsage | yes | yes | may harm broker if many queues |
+
+### Port registration
 
 The [registered](https://github.com/prometheus/prometheus/wiki/Default-port-allocations) default port for Solace is 9628  
 
@@ -78,9 +103,6 @@ timeout=5s
 
 # Flag that enables SSL certificate verification for the scrape URI.
 sslVerify=false
-
-# Flag that enables scrape of redundancy metrics. Should be used for broker HA groups.
-redundancy=false
 ```
 
 ### Environment Variables
@@ -92,13 +114,12 @@ SOLACE_USERNAME=admin
 SOLACE_PASSWORD=admin
 SOLACE_TIMEOUT=5s
 SOLACE_SSL_VERIFY=false
-SOLACE_REDUNDANCY=false
 ```
 
 ### URL
 
 You can call:
-`https://your_exporter:9628/solace-vpn-std?scrapeURI=https%3A%2F%2Fyour-broker%3A943&username=monitoring&password=monitoring`
+`https://your_exporter:9628/solace?m.ClientStats=*|*&m.VpnStats=*|*&scrapeURI=https%3A%2F%2Fyour-broker%3A943&username=monitoring&password=monitoring`
 
 This allows you to over write the parameters:
 - scrapeURI
@@ -155,7 +176,6 @@ SOLACE_USERNAME=admin
 SOLACE_PASSWORD=admin
 SOLACE_TIMEOUT=5s
 SOLACE_SSL_VERIFY=false
-SOLACE_REDUNDANCY=false
 ```
 
 Then run
