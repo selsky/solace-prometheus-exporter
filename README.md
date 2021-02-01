@@ -20,12 +20,12 @@ It implements the following endpoints:
 ```
 http://<host>:<port>/         Document page showing list of endpoints
 http://<host>:<port>/metrics             Golang and standard Prometheus metrics
-http://<host>:<port>/solace-std          Deprecated: Solace metrics for System and VPN levels
-http://<host>:<port>/solace-det          Deprecated: Solace metrics for Messaging Clients and Queues
-http://<host>:<port>/solace-broker-std   Deprecated: Solace Broker only Standard Metrics (System)
-http://<host>:<port>/solace-vpn-std      Deprecated: Solace Vpn only Standard Metrics (VPN), available to non-global access right admins
-http://<host>:<port>/solace-vpn-stats    Deprecated: Solace Vpn only Statistics Metrics (VPN), available to non-global access right admins
-http://<host>:<port>/solace-vpn-det      Deprecated: Solace Vpn only Detailed Metrics (VPN), available to non-global access right admins
+http://<host>:<port>/solace-std          legacy, via config: Solace metrics for System and VPN levels
+http://<host>:<port>/solace-det          legacy, via config: Solace metrics for Messaging Clients and Queues
+http://<host>:<port>/solace-broker-std   legacy, via config: Solace Broker only Standard Metrics (System)
+http://<host>:<port>/solace-vpn-std      legacy, via config: Solace Vpn only Standard Metrics (VPN), available to non-global access right admins
+http://<host>:<port>/solace-vpn-stats    legacy, via config: Solace Vpn only Statistics Metrics (VPN), available to non-global access right admins
+http://<host>:<port>/solace-vpn-det      legacy, via config: Solace Vpn only Detailed Metrics (VPN), available to non-global access right admins
 http://<host>:<port>/solace              The modular endpoint
 ```
 
@@ -39,7 +39,7 @@ The first asterisk the VPN filter, and the second asterisk the item filter. Not 
 Scrape targets:
 
 
-| scape target	| vpn filter supports | item filter supported | performance impact |
+| scrape target	| vpn filter supports | item filter supported | performance impact |
 |---------------|---------------------|-----------------------|------------------------|
 | Version | no | no | dont harm broker |
 | Health | no | no | dont harm broker |
@@ -56,6 +56,30 @@ Scrape targets:
 | BridgeStats | yes | yes | has a very small performance down site |
 | QueueRates | yes | yes | may harm broker if many queues |
 | QueueUsage | yes | yes | may harm broker if many queues |
+
+Each scrape target can be used multiple times.  
+Example `http://127.0.0.1:9628/solace?m.VpnStats=*|*&m.BridgeStats=*|*&m.QueueRates=*|ARBON/*&m.QueueRates=*|BRAVO/*&scrapeURI=http://the-broker:8080`  
+Here we want only queues beginning with BRAVO or ARBON.
+
+### Modular endpoint configs
+
+If you want to keep the endpoint urls short, you can configure endpoints via ini file.
+
+```ini
+[endpoint.solace-det]
+ClientStats=*|*
+VpnStats=*|*
+BridgeStats=*|*
+QueueRates=*|*
+QueueUsage=*|*
+
+```
+
+This will provide a new endpoint.  
+http://where-the-exporter-run:9628/solace-det  
+
+This will provide the same output as:    
+http://where-the-exporter-run:9628/solace?m.ClientStats=*|*&?m.VpnStats=*|*&?m.BridgeStats=*|*&?m.QueueRates=*|*&?m.QueueUsage=*|*
 
 ### Port registration
 

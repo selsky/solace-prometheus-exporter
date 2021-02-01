@@ -123,12 +123,6 @@ var metricDesc = map[string]Metrics{
 		"system_redundancy_role":         prometheus.NewDesc(namespace+"_"+"system_redundancy_role", "Redundancy role (0=Backup, 1=Primary, 2=Monitor, 3-Undefined).", variableLabelsRedundancy, nil),
 		"system_redundancy_local_active": prometheus.NewDesc(namespace+"_"+"system_redundancy_local_active", "Is local node the active messaging node? (0-not active, 1-active).", variableLabelsRedundancy, nil),
 	},
-	"ConfigSyncRouter": {
-		"configsync_table_type":               prometheus.NewDesc(namespace+"_"+"configsync_table_type", "Config Sync Resource Type (0-Router, 1-Vpn, 2-Unknown, 3-None, 4-All)", variableLabelsConfigSyncTable, nil),
-		"configsync_table_timeinstateseconds": prometheus.NewDesc(namespace+"_"+"configsync_table_timeinstateseconds", "Config Sync Time in State", variableLabelsConfigSyncTable, nil),
-		"configsync_table_ownership":          prometheus.NewDesc(namespace+"_"+"configsync_table_ownership", "Config Sync Ownership (0-Master, 1-Slave, 2-Unknown)", variableLabelsConfigSyncTable, nil),
-		"configsync_table_syncstate":          prometheus.NewDesc(namespace+"_"+"configsync_table_syncstate", "Config Sync State (0-Down, 1-Up, 2-Unknown, 3-In-Sync, 4-Reconciling, 5-Blocked, 6-Out-Of-Sync)", variableLabelsConfigSyncTable, nil),
-	},
 	"Vpn": {
 		"vpn_is_management_vpn":                 prometheus.NewDesc(namespace+"_"+"vpn_is_management_vpn", "VPN is a management VPN", variableLabelsVpn, nil),
 		"vpn_enabled":                           prometheus.NewDesc(namespace+"_"+"vpn_enabled", "VPN is enabled", variableLabelsVpn, nil),
@@ -146,7 +140,13 @@ var metricDesc = map[string]Metrics{
 		"vpn_replication_config_state":                 prometheus.NewDesc(namespace+"_"+"vpn_replication_config_state", "Replication Config Status (0-standby, 1-active, 2-n/a)", variableLabelsVpn, nil),
 		"vpn_replication_transaction_replication_mode": prometheus.NewDesc(namespace+"_"+"vpn_replication_transaction_replication_mode", "Replication Tx Replication Mode (0-async, 1-sync)", variableLabelsVpn, nil),
 	},
-	"ConfigSync": {
+	"ConfigSyncVpn": {
+		"configsync_table_type":               prometheus.NewDesc(namespace+"_"+"configsync_table_type", "Config Sync Resource Type (0-Router, 1-Vpn, 2-Unknown, 3-None, 4-All)", variableLabelsConfigSyncTable, nil),
+		"configsync_table_timeinstateseconds": prometheus.NewDesc(namespace+"_"+"configsync_table_timeinstateseconds", "Config Sync Time in State", variableLabelsConfigSyncTable, nil),
+		"configsync_table_ownership":          prometheus.NewDesc(namespace+"_"+"configsync_table_ownership", "Config Sync Ownership (0-Master, 1-Slave, 2-Unknown)", variableLabelsConfigSyncTable, nil),
+		"configsync_table_syncstate":          prometheus.NewDesc(namespace+"_"+"configsync_table_syncstate", "Config Sync State (0-Down, 1-Up, 2-Unknown, 3-In-Sync, 4-Reconciling, 5-Blocked, 6-Out-Of-Sync)", variableLabelsConfigSyncTable, nil),
+	},
+	"ConfigSyncRouter": {
 		"configsync_table_type":               prometheus.NewDesc(namespace+"_"+"configsync_table_type", "Config Sync Resource Type (0-Router, 1-Vpn, 2-Unknown, 3-None, 4-All)", variableLabelsConfigSyncTable, nil),
 		"configsync_table_timeinstateseconds": prometheus.NewDesc(namespace+"_"+"configsync_table_timeinstateseconds", "Config Sync Time in State", variableLabelsConfigSyncTable, nil),
 		"configsync_table_ownership":          prometheus.NewDesc(namespace+"_"+"configsync_table_ownership", "Config Sync Ownership (0-Master, 1-Slave, 2-Unknown)", variableLabelsConfigSyncTable, nil),
@@ -536,10 +536,10 @@ func (e *Exporter) getConfigSyncRouterSemp1(ch chan<- prometheus.Metric) (ok flo
 	}
 
 	for _, table := range target.RPC.Show.ConfigSync.Database.Local.Tables.Table {
-		ch <- prometheus.MustNewConstMetric(metricDesc["ConfigSync"]["configsync_table_type"], prometheus.GaugeValue, encodeMetricMulti(table.Type, []string{"Router", "Vpn", "Unknown", "None", "All"}), table.Name)
-		ch <- prometheus.MustNewConstMetric(metricDesc["ConfigSync"]["configsync_table_timeinstateseconds"], prometheus.CounterValue, table.TimeInStateSeconds, table.Name)
-		ch <- prometheus.MustNewConstMetric(metricDesc["ConfigSync"]["configsync_table_ownership"], prometheus.GaugeValue, encodeMetricMulti(table.Ownership, []string{"Master", "Slave", "Unknown"}), table.Name)
-		ch <- prometheus.MustNewConstMetric(metricDesc["ConfigSync"]["configsync_table_syncstate"], prometheus.GaugeValue, encodeMetricMulti(table.SyncState, []string{"Down", "Up", "Unknown", "In-Sync", "Reconciling", "Blocked", "Out-Of-Sync"}), table.Name)
+		ch <- prometheus.MustNewConstMetric(metricDesc["ConfigSyncRouter"]["configsync_table_type"], prometheus.GaugeValue, encodeMetricMulti(table.Type, []string{"Router", "Vpn", "Unknown", "None", "All"}), table.Name)
+		ch <- prometheus.MustNewConstMetric(metricDesc["ConfigSyncRouter"]["configsync_table_timeinstateseconds"], prometheus.CounterValue, table.TimeInStateSeconds, table.Name)
+		ch <- prometheus.MustNewConstMetric(metricDesc["ConfigSyncRouter"]["configsync_table_ownership"], prometheus.GaugeValue, encodeMetricMulti(table.Ownership, []string{"Master", "Slave", "Unknown"}), table.Name)
+		ch <- prometheus.MustNewConstMetric(metricDesc["ConfigSyncRouter"]["configsync_table_syncstate"], prometheus.GaugeValue, encodeMetricMulti(table.SyncState, []string{"Down", "Up", "Unknown", "In-Sync", "Reconciling", "Blocked", "Out-Of-Sync"}), table.Name)
 	}
 
 	return 1
@@ -708,10 +708,10 @@ func (e *Exporter) getConfigSyncVpnSemp1(ch chan<- prometheus.Metric, vpnFilter 
 	}
 
 	for _, table := range target.RPC.Show.ConfigSync.Database.Local.Tables.Table {
-		ch <- prometheus.MustNewConstMetric(metricDesc["ConfigSync"]["configsync_table_type"], prometheus.GaugeValue, encodeMetricMulti(table.Type, []string{"Router", "Vpn", "Unknown", "None", "All"}), table.Name)
-		ch <- prometheus.MustNewConstMetric(metricDesc["ConfigSync"]["configsync_table_timeinstateseconds"], prometheus.CounterValue, table.TimeInStateSeconds, table.Name)
-		ch <- prometheus.MustNewConstMetric(metricDesc["ConfigSync"]["configsync_table_ownership"], prometheus.GaugeValue, encodeMetricMulti(table.Ownership, []string{"Master", "Slave", "Unknown"}), table.Name)
-		ch <- prometheus.MustNewConstMetric(metricDesc["ConfigSync"]["configsync_table_syncstate"], prometheus.GaugeValue, encodeMetricMulti(table.SyncState, []string{"Down", "Up", "Unknown", "In-Sync", "Reconciling", "Blocked", "Out-Of-Sync"}), table.Name)
+		ch <- prometheus.MustNewConstMetric(metricDesc["ConfigSyncVpn"]["configsync_table_type"], prometheus.GaugeValue, encodeMetricMulti(table.Type, []string{"Router", "Vpn", "Unknown", "None", "All"}), table.Name)
+		ch <- prometheus.MustNewConstMetric(metricDesc["ConfigSyncVpn"]["configsync_table_timeinstateseconds"], prometheus.CounterValue, table.TimeInStateSeconds, table.Name)
+		ch <- prometheus.MustNewConstMetric(metricDesc["ConfigSyncVpn"]["configsync_table_ownership"], prometheus.GaugeValue, encodeMetricMulti(table.Ownership, []string{"Master", "Slave", "Unknown"}), table.Name)
+		ch <- prometheus.MustNewConstMetric(metricDesc["ConfigSyncVpn"]["configsync_table_syncstate"], prometheus.GaugeValue, encodeMetricMulti(table.SyncState, []string{"Down", "Up", "Unknown", "In-Sync", "Reconciling", "Blocked", "Out-Of-Sync"}), table.Name)
 	}
 
 	return 1
@@ -755,7 +755,7 @@ func (e *Exporter) getBridgeSemp1(ch chan<- prometheus.Metric, vpnFilter string,
 		} `xml:"execute-result"`
 	}
 
-	command := "<rpc><show><bridge><bridge-name-pattern>" + itemFilter + "</bridge-name-pattern><vpn-name>" + vpnFilter + "</vpn-name></bridge></show></rpc>"
+	command := "<rpc><show><bridge><bridge-name-pattern>" + itemFilter + "</bridge-name-pattern><vpn-name-pattern>" + vpnFilter + "</vpn-name-pattern></bridge></show></rpc>"
 	body, err := e.postHTTP(e.config.scrapeURI+"/SEMP", "application/xml", command)
 	if err != nil {
 		_ = level.Error(e.logger).Log("msg", "Can't scrape BridgeSemp1", "err", err, "broker", e.config.scrapeURI)
@@ -1341,6 +1341,18 @@ type DataSource struct {
 	itemFilter string
 }
 
+func (dataSource DataSource) String() string {
+	return fmt.Sprintf("%s=%s|%s", dataSource.name, dataSource.vpnFilter, dataSource.itemFilter)
+}
+
+func logDataSource(dataSources []DataSource) string {
+	dS := make([]string, len(dataSources))
+	for index, dataSource := range dataSources {
+		dS[index] = dataSource.String()
+	}
+	return strings.Join(dS, "&")
+}
+
 func parseConfigBool(cfg *ini.File, logger log.Logger, iniSection string, iniKey string, envKey string, okp *bool) bool {
 	var ok = true
 	s := parseConfigString(cfg, logger, iniSection, iniKey, envKey, &ok)
@@ -1385,10 +1397,10 @@ func parseConfigString(cfg *ini.File, logger log.Logger, iniSection string, iniK
 	return ""
 }
 
-func parseConfig(configFile string, conf *config, logger log.Logger) (ok bool) {
-	var oki = true
+func parseConfig(configFile string, conf *config, logger log.Logger) (bool, map[string][]DataSource) {
 	var cfg *ini.File = nil
 	var err interface{}
+	var oki = true
 
 	if len(configFile) > 0 {
 		opts := ini.LoadOptions{
@@ -1397,7 +1409,7 @@ func parseConfig(configFile string, conf *config, logger log.Logger) (ok bool) {
 		cfg, err = ini.LoadSources(opts, configFile)
 		if err != nil {
 			_ = level.Error(logger).Log("msg", "Can't open config file", "err", err)
-			return false
+			return false, nil
 		}
 	}
 
@@ -1408,7 +1420,32 @@ func parseConfig(configFile string, conf *config, logger log.Logger) (ok bool) {
 	conf.timeout = parseConfigDuration(cfg, logger, "solace", "timeout", "SOLACE_TIMEOUT", &oki)
 	conf.sslVerify = parseConfigBool(cfg, logger, "solace", "sslVerify", "SOLACE_SSL_VERIFY", &oki)
 
-	return oki
+	endpoints := make(map[string][]DataSource)
+	for _, section := range cfg.Sections() {
+		if strings.HasPrefix(section.Name(), "endpoint.") {
+			endpointName := strings.TrimPrefix(section.Name(), "endpoint.")
+
+			var dataSource []DataSource
+			for _, key := range section.Keys() {
+				scrapeTarget := key.Name()
+
+				parts := strings.Split(key.String(), "|")
+				if len(parts) != 2 {
+					_ = level.Error(logger).Log("msg", "Exactly one | expected. Use VPN wildcard. |. Item wildcard.", "endpointName", endpointName, "key", key.Name(), "value", key.String())
+				} else {
+					dataSource = append(dataSource, DataSource{
+						name:       scrapeTarget,
+						vpnFilter:  parts[0],
+						itemFilter: parts[1],
+					})
+				}
+			}
+
+			endpoints[endpointName] = dataSource
+		}
+	}
+
+	return oki, endpoints
 }
 
 // NewExporter returns an initialized Exporter.
@@ -1502,7 +1539,8 @@ func main() {
 	logger := promlog.New(&promlogConfig)
 
 	var conf config
-	if !parseConfig(*configFile, &conf, logger) {
+	oki, endpoints := parseConfig(*configFile, &conf, logger)
+	if !oki {
 		os.Exit(1)
 	}
 
@@ -1510,7 +1548,7 @@ func main() {
 	_ = level.Info(logger).Log("msg", "Build context", "context", version.BuildContext())
 
 	_ = level.Info(logger).Log("msg", "Scraping",
-		"listenAddr", conf.listenAddr,
+		"listenAddr", "http://"+conf.listenAddr,
 		"scrapeURI", conf.scrapeURI,
 		"username", conf.username,
 		"sslVerify", conf.sslVerify,
@@ -1525,168 +1563,16 @@ func main() {
 		doHandle(w, r, nil, conf, logger)
 	})
 
-	http.HandleFunc("/solace-std", func(w http.ResponseWriter, r *http.Request) {
-		var dataSource = []DataSource{
-			{
-				name:       "Version",
-				vpnFilter:  "*",
-				itemFilter: "*",
-			},
-			{
-				name:       "Health",
-				vpnFilter:  "*",
-				itemFilter: "*",
-			},
-			{
-				name:       "Spool",
-				vpnFilter:  "*",
-				itemFilter: "*",
-			},
-			{
-				name:       "Vpn",
-				vpnFilter:  "*",
-				itemFilter: "*",
-			},
-			{
-				name:       "Bridge",
-				vpnFilter:  "*",
-				itemFilter: "*",
-			},
-			{
-				name:       "VpnSpool",
-				vpnFilter:  "*",
-				itemFilter: "*",
-			},
-		}
+	declareHandlerFromConfig := func(urlPath string, dataSource []DataSource) {
+		_ = level.Info(logger).Log("msg", "Register handler from config", "handler", "/"+urlPath, "dataSource", logDataSource(dataSource))
+		http.HandleFunc("/"+urlPath, func(w http.ResponseWriter, r *http.Request) {
+			doHandle(w, r, dataSource, conf, logger)
+		})
+	}
+	for urlPath, dataSource := range endpoints {
+		declareHandlerFromConfig(urlPath, dataSource)
+	}
 
-		doHandle(w, r, dataSource, conf, logger)
-	})
-	http.HandleFunc("/solace-det", func(w http.ResponseWriter, r *http.Request) {
-		var dataSource = []DataSource{
-			{
-				name:       "ClientStats",
-				vpnFilter:  "*",
-				itemFilter: "*",
-			},
-			{
-				name:       "VpnStats",
-				vpnFilter:  "*",
-				itemFilter: "*",
-			},
-			{
-				name:       "BridgeStats",
-				vpnFilter:  "*",
-				itemFilter: "*",
-			},
-			{
-				name:       "QueueRates",
-				vpnFilter:  "*",
-				itemFilter: "*",
-			},
-			{
-				name:       "QueueUsage",
-				vpnFilter:  "*",
-				itemFilter: "*",
-			},
-			{
-				name:       "VpnSpool",
-				vpnFilter:  "*",
-				itemFilter: "*",
-			},
-		}
-
-		doHandle(w, r, dataSource, conf, logger)
-	})
-
-	http.HandleFunc("/solace-broker-std", func(w http.ResponseWriter, r *http.Request) {
-		var dataSource = []DataSource{
-			{
-				name:       "Version",
-				vpnFilter:  "*",
-				itemFilter: "*",
-			},
-			{
-				name:       "Health",
-				vpnFilter:  "*",
-				itemFilter: "*",
-			},
-			{
-				name:       "Spool",
-				vpnFilter:  "*",
-				itemFilter: "*",
-			},
-		}
-
-		doHandle(w, r, dataSource, conf, logger)
-	})
-	http.HandleFunc("/solace-vpn-std", func(w http.ResponseWriter, r *http.Request) {
-		var dataSource = []DataSource{
-			{
-				name:       "Vpn",
-				vpnFilter:  "*",
-				itemFilter: "*",
-			},
-			{
-				name:       "VpnReplication",
-				vpnFilter:  "*",
-				itemFilter: "*",
-			},
-			{
-				name:       "ConfigSyncVpn",
-				vpnFilter:  "*",
-				itemFilter: "*",
-			},
-			{
-				name:       "Bridge",
-				vpnFilter:  "*",
-				itemFilter: "*",
-			},
-			{
-				name:       "VpnSpool",
-				vpnFilter:  "*",
-				itemFilter: "*",
-			},
-		}
-
-		doHandle(w, r, dataSource, conf, logger)
-	})
-	http.HandleFunc("/solace-vpn-stats", func(w http.ResponseWriter, r *http.Request) {
-		var dataSource = []DataSource{
-			{
-				name:       "ClientStats",
-				vpnFilter:  "*",
-				itemFilter: "*",
-			},
-			{
-				name:       "VpnStats",
-				vpnFilter:  "*",
-				itemFilter: "*",
-			},
-			{
-				name:       "BridgeStats",
-				vpnFilter:  "*",
-				itemFilter: "*",
-			},
-			{
-				name:       "QueueRates",
-				vpnFilter:  "*",
-				itemFilter: "*",
-			},
-		}
-
-		doHandle(w, r, dataSource, conf, logger)
-	})
-	http.HandleFunc("/solace-vpn-det", func(w http.ResponseWriter, r *http.Request) {
-		var dataSource = []DataSource{
-			{
-				name:       "QueueUsage",
-				vpnFilter:  "*",
-				itemFilter: "*",
-			},
-		}
-
-		doHandle(w, r, dataSource, conf, logger)
-	})
 	http.HandleFunc("/solace", func(w http.ResponseWriter, r *http.Request) {
 		var err = r.ParseForm()
 		if err != nil {
@@ -1789,7 +1675,7 @@ func doHandle(w http.ResponseWriter, r *http.Request, dataSource []DataSource, c
 			conf.scrapeURI = scrapeURI
 		}
 
-		_ = level.Info(logger).Log("msg", "handle http request", "dataSource", fmt.Sprintf("%#v", dataSource), "scrapeURI", conf.scrapeURI)
+		_ = level.Info(logger).Log("msg", "handle http request", "dataSource", logDataSource(dataSource), "scrapeURI", conf.scrapeURI)
 
 		exporter := NewExporter(logger, conf)
 		registry := prometheus.NewRegistry()
