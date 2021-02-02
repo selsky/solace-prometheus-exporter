@@ -236,7 +236,7 @@ var metricDesc = map[string]Metrics{
 		"queue_rx_byte_rate_avg": prometheus.NewDesc(namespace+"_"+"queue_rx_byte_rate_avg", "Averate rate of received bytes.", variableLabelsVpnQueue, nil),
 		"queue_tx_byte_rate_avg": prometheus.NewDesc(namespace+"_"+"queue_tx_byte_rate_avg", "Averate rate of transmitted bytes.", variableLabelsVpnQueue, nil),
 	},
-	"QueueUsage": {
+	"QueueDetails": {
 		"queue_spool_quota_bytes": prometheus.NewDesc(namespace+"_"+"queue_spool_quota_bytes", "Queue spool configured max disk usage in bytes.", variableLabelsVpnQueue, nil),
 		"queue_spool_usage_bytes": prometheus.NewDesc(namespace+"_"+"queue_spool_usage_bytes", "Queue spool usage in bytes.", variableLabelsVpnQueue, nil),
 		"queue_spool_usage_msgs":  prometheus.NewDesc(namespace+"_"+"queue_spool_usage_msgs", "Queue spooled number of messages.", variableLabelsVpnQueue, nil),
@@ -1186,7 +1186,7 @@ func (e *Exporter) getQueueRatesSemp1(ch chan<- prometheus.Metric, vpnFilter str
 
 // Get some statistics for each individual queue of all vpn's
 // This can result in heavy system load for lots of queues
-func (e *Exporter) getQueueUsageSemp1(ch chan<- prometheus.Metric, vpnFilter string, itemFilter string) (ok float64) {
+func (e *Exporter) getQueueDetailsSemp1(ch chan<- prometheus.Metric, vpnFilter string, itemFilter string) (ok float64) {
 	type Data struct {
 		RPC struct {
 			Show struct {
@@ -1217,7 +1217,7 @@ func (e *Exporter) getQueueUsageSemp1(ch chan<- prometheus.Metric, vpnFilter str
 	for nextRequest := "<rpc><show><queue><name>" + itemFilter + "</name><vpn-name>" + vpnFilter + "</vpn-name><detail/><count/><num-elements>100</num-elements></queue></show></rpc>"; nextRequest != ""; {
 		body, err := e.postHTTP(e.config.scrapeURI+"/SEMP", "application/xml", nextRequest)
 		if err != nil {
-			_ = level.Error(e.logger).Log("msg", "Can't scrape QueueUsageSemp1", "err", err, "broker", e.config.scrapeURI)
+			_ = level.Error(e.logger).Log("msg", "Can't scrape QueueDetailsSemp1", "err", err, "broker", e.config.scrapeURI)
 			return 0
 		}
 		defer body.Close()
@@ -1225,11 +1225,11 @@ func (e *Exporter) getQueueUsageSemp1(ch chan<- prometheus.Metric, vpnFilter str
 		var target Data
 		err = decoder.Decode(&target)
 		if err != nil {
-			_ = level.Error(e.logger).Log("msg", "Can't decode QueueUsageSemp1", "err", err, "broker", e.config.scrapeURI)
+			_ = level.Error(e.logger).Log("msg", "Can't decode QueueDetailsSemp1", "err", err, "broker", e.config.scrapeURI)
 			return 0
 		}
 		if target.ExecuteResult.Result != "ok" {
-			_ = level.Error(e.logger).Log("msg", "Can't scrape QueueUsageSemp1", "err", err, "broker", e.config.scrapeURI)
+			_ = level.Error(e.logger).Log("msg", "Can't scrape QueueDetailsSemp1", "err", err, "broker", e.config.scrapeURI)
 			return 0
 		}
 
@@ -1237,10 +1237,10 @@ func (e *Exporter) getQueueUsageSemp1(ch chan<- prometheus.Metric, vpnFilter str
 		nextRequest = target.MoreCookie.RPC
 
 		for _, queue := range target.RPC.Show.Queue.Queues.Queue {
-			ch <- prometheus.MustNewConstMetric(metricDesc["QueueUsage"]["queue_spool_quota_bytes"], prometheus.GaugeValue, math.Round(queue.Info.Quota*1048576.0), queue.Info.MsgVpnName, queue.QueueName)
-			ch <- prometheus.MustNewConstMetric(metricDesc["QueueUsage"]["queue_spool_usage_bytes"], prometheus.GaugeValue, math.Round(queue.Info.Usage*1048576.0), queue.Info.MsgVpnName, queue.QueueName)
-			ch <- prometheus.MustNewConstMetric(metricDesc["QueueUsage"]["queue_spool_usage_msgs"], prometheus.GaugeValue, queue.Info.SpooledMsgCount, queue.Info.MsgVpnName, queue.QueueName)
-			ch <- prometheus.MustNewConstMetric(metricDesc["QueueUsage"]["queue_binds"], prometheus.GaugeValue, queue.Info.BindCount, queue.Info.MsgVpnName, queue.QueueName)
+			ch <- prometheus.MustNewConstMetric(metricDesc["QueueDetails"]["queue_spool_quota_bytes"], prometheus.GaugeValue, math.Round(queue.Info.Quota*1048576.0), queue.Info.MsgVpnName, queue.QueueName)
+			ch <- prometheus.MustNewConstMetric(metricDesc["QueueDetails"]["queue_spool_usage_bytes"], prometheus.GaugeValue, math.Round(queue.Info.Usage*1048576.0), queue.Info.MsgVpnName, queue.QueueName)
+			ch <- prometheus.MustNewConstMetric(metricDesc["QueueDetails"]["queue_spool_usage_msgs"], prometheus.GaugeValue, queue.Info.SpooledMsgCount, queue.Info.MsgVpnName, queue.QueueName)
+			ch <- prometheus.MustNewConstMetric(metricDesc["QueueDetails"]["queue_binds"], prometheus.GaugeValue, queue.Info.BindCount, queue.Info.MsgVpnName, queue.QueueName)
 		}
 		body.Close()
 	}
@@ -1511,8 +1511,8 @@ func (e *Exporter) Collect(ch chan<- prometheus.Metric) {
 			up = e.getBridgeStatsSemp1(ch, dataSource.vpnFilter, dataSource.itemFilter)
 		case "QueueRates":
 			up = e.getQueueRatesSemp1(ch, dataSource.vpnFilter, dataSource.itemFilter)
-		case "QueueUsage":
-			up = e.getQueueUsageSemp1(ch, dataSource.vpnFilter, dataSource.itemFilter)
+		case "QueueDetails":
+			up = e.getQueueDetailsSemp1(ch, dataSource.vpnFilter, dataSource.itemFilter)
 		}
 	}
 }
@@ -1602,18 +1602,18 @@ func main() {
 	})
 
 	http.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
+		var endpointsDoc bytes.Buffer
+		for urlPath, dataSources := range endpoints {
+			endpointsDoc.WriteString("<li><a href='/" + urlPath + "'>Custom Exporter " + urlPath + " -> " + logDataSource(dataSources) + "</a></li>")
+		}
+
 		_, _ = w.Write([]byte(`<html>
             <head><title>Solace Exporter</title></head>
             <body>
             <h1>Solace Exporter</h1>
             <ul style="list-style: none;">
                 <li><a href='` + "/metrics" + `'>Exporter Metrics</a></li>
-                <li><a href='` + "/solace-std" + `'>Deprecated: Solace Broker all Standard Metrics </a></li>
-                <li><a href='` + "/solace-det" + `'>Deprecated: Solace Broker Detail Statistics</a></li>
-                <li><a href='` + "/solace-broker-std" + `'>Deprecated: Solace Broker only Standard Metrics (Global Access)</a></li>
-                <li><a href='` + "/solace-vpn-std" + `'>Deprecated: Solace Vpn only Standard Metrics (VPN Access)</a></li>
-                <li><a href='` + "/solace-vpn-stats" + `'>Deprecated: Solace Vpn only Statistics (VPN Access)</a></li>
-                <li><a href='` + "/solace-vpn-det" + `'>Deprecated: Solace Vpn only Detailed Metrics (VPN Access)</a></li>
+				` + endpointsDoc.String() + `
 				<li><a href='` + "/solace?m.ClientStats=*|*&m.VpnStats=*|*&m.BridgeStats=*|*&m.QueueRates=*|*" + `'>Solace Broker</a>
 				<br>
 				<p>Configure the data you want ot receive, via HTTP GET parameters.
@@ -1638,7 +1638,7 @@ func main() {
 					<tr><td>VpnStats</td><td>yes</td><td>no</td><td>has a very small performance down site</td></tr>
 					<tr><td>BridgeStats</td><td>yes</td><td>yes</td><td>has a very small performance down site</td></tr>
 					<tr><td>QueueRates</td><td>yes</td><td>yes</td><td>may harm broker if many queues</td></tr>
-					<tr><td>QueueUsage</td><td>yes</td><td>yes</td><td>may harm broker if many queues</td></tr>
+					<tr><td>QueueDetails</td><td>yes</td><td>yes</td><td>may harm broker if many queues</td></tr>
 				</table>
 				<br>
 				</p>
@@ -1665,6 +1665,7 @@ func doHandle(w http.ResponseWriter, r *http.Request, dataSource []DataSource, c
 		username := r.FormValue("username")
 		password := r.FormValue("password")
 		scrapeURI := r.FormValue("scrapeURI")
+		timeout := r.FormValue("timeout")
 		if len(username) > 0 {
 			conf.username = username
 		}
@@ -1673,6 +1674,13 @@ func doHandle(w http.ResponseWriter, r *http.Request, dataSource []DataSource, c
 		}
 		if len(scrapeURI) > 0 {
 			conf.scrapeURI = scrapeURI
+		}
+		if len(timeout) > 0 {
+			var err error
+			conf.timeout, err = time.ParseDuration(timeout)
+			if err != nil {
+				_ = level.Error(logger).Log("msg", "Per HTTP given timeout parameter is not valid", "err", err, "timeout", timeout)
+			}
 		}
 
 		_ = level.Info(logger).Log("msg", "handle http request", "dataSource", logDataSource(dataSource), "scrapeURI", conf.scrapeURI)
